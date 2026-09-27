@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import url from 'node:url';
 import serverless from 'serverless-http';
 
 dotenv.config();
