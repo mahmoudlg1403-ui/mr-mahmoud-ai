@@ -1,0 +1,12 @@
+{
+  "name": "mr-mahmoud-ai-netlify",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {"start": "echo Netlify Functions project"},
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "serverless-http": "^3.2.0"
+  }
+}
