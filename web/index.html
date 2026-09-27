@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg">
+<title>Mr. Mahmoud AI</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080d1a;color:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.app{max-width:760px;margin:auto;padding:16px 14px 30px}
+header{padding:12px 4px 18px}
+h1{margin:0;font-size:27px}
+.sub{opacity:.65;font-size:13px;margin-top:5px}
+.card{background:#111827;border:1px solid #26334d;border-radius:20px;padding:15px;margin:12px 0}
+.status{font-size:13px;opacity:.8}
+.online{color:#86efac}
+.offline{color:#fca5a5}
+select,textarea,button{
+width:100%;border:1px solid #334155;border-radius:14px;
+background:#0b1220;color:#fff;padding:13px;font:inherit
+}
+textarea{resize:vertical;min-height:100px;margin-top:10px}
+button{background:#2563eb;border:0;font-weight:700;cursor:pointer}
+button.secondary{background:#263449}
+button.voice{background:#7c3aed}
+.row{display:flex;gap:8px;margin-top:9px}
+.row>*{flex:1}
+.msg{padding:13px;border-radius:16px;margin:9px 0;white-space:pre-wrap;line-height:1.7}
+.user{background:#1d4ed8}
+.ai{background:#182235}
+.small{font-size:12px;opacity:.65}
+.title{font-weight:700;margin-bottom:8px}
+#out{margin-top:12px}
+</style>
+</head>
+
+<body>
+<main class="app">
+
+<header>
+<h1>🤖 محمود AI</h1>
+<div class="sub">دستیار شخصی هوشمند فارسی</div>
+</header>
+
+<div class="card">
+<div id="health" class="status">در حال اتصال...</div>
+</div>
+
+<div class="card">
+
+<select id="provider">
+<option value="auto">خودکار</option>
+<option value="openai">GPT</option>
+<option value="claude">Claude</option>
+</select>
+
+<textarea id="q" placeholder="چه کاری برایت انجام بدهم؟"></textarea>
+
+<div class="row">
+<button class="voice" onclick="voice()">🎙️ صحبت کردن</button>
+<button class="secondary" onclick="speakLast()">🔊 خواندن پاسخ</button>
+</div>
+
+<div class="row">
+<button onclick="chat()">ارسال</button>
+<button onclick="agent()">🤖 Agent</button>
+</div>
+
+</div>
+
+<div id="out"></div>
+
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+
+const FN='/.netlify/functions/api';
+
+let lastAnswer='';
+
+function escapeHTML(s){
+return String(s).replace(/[&<>"]/g,c=>({
+'&':'&amp;',
+'<':'&lt;',
+'>':'&gt;',
+'"':'&quot;'
+}[c]));
+}
+
+function add(type,text){
+const div=document.createElement('div');
+div.className='msg '+(type==='user'?'user':'ai');
+div.innerHTML=escapeHTML(text);
+$('out').appendChild(div);
+window.scrollTo(0,document.body.scrollHeight);
+}
+
+async function check(){
+
+try{
+
+const r=await fetch(FN+'/health');
+const j=await r.json();
+
+$('health').innerHTML=
+'<span class="online">● آنلاین</span> — نسخه '+(j.version||'8.0');
+
+}catch(e){
+
+$('health').innerHTML=
+'<span class="offline">● Backend در دسترس نیست</span>';
+
+}
+
+}
+
+async function chat(){
+
+const q=$('q').value.trim();
+
+if(!q)return;
+
+add('user',q);
+
+$('q').value='';
+
+try{
+
+const r=await fetch(FN+'/api/chat',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({
+provider:$('provider').value,
+messages:[{
+role:'user',
+content:q
+}]
+})
+});
+
+const j=await r.json();
+
+const answer=j.text||j.error||'پاسخی دریافت نشد.';
+
+lastAnswer=answer;
+
+add('ai',answer);
+
+speak(answer);
+
+}catch(e){
+
+add('ai','خطا در اتصال به دستیار: '+e.message);
+
+}
+
+}
+
+async function agent(){
+
+const q=$('q').value.trim();
+
+if(!q)return;
+
+add('user','🤖 Agent: '+q);
+
+$('q').value='';
+
+try{
+
+const r=await fetch(FN+'/api/agent',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({
+provider:$('provider').value,
+goal:q
+})
+});
+
+const j=await r.json();
+
+if(j.error){
+
+add('ai','خطا: '+j.error);
+return;
+
+}
+
+const text=
+'برنامه Agent آماده شد:\n\n'+
+(j.plan?.summary||'')+
+'\n\n'+
+(j.plan?.steps||[]).map((x,i)=>
+(i+1)+'. '+(x.title||x.action||'مرحله')
+).join('\n');
+
+lastAnswer=text;
+
+add('ai',text);
+
+speak(text);
+
+}catch(e){
+
+add('ai','خطا در Agent: '+e.message);
+
+}
+
+}
+
+function voice(){
+
+if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){
+
+alert('تشخیص صدا در این مرورگر پشتیبانی نمی‌شود. Chrome را امتحان کنید.');
+
+return;
+
+}
+
+const SpeechRecognition=
+window.SpeechRecognition||
+window.webkitSpeechRecognition;
+
+const recognition=new SpeechRecognition();
+
+recognition.lang='fa-IR';
+recognition.interimResults=false;
+recognition.continuous=false;
+
+recognition.onstart=()=>{
+
+$('q').placeholder='🎙️ گوش می‌دهم... صحبت کنید';
+
+};
+
+recognition.onresult=e=>{
+
+$('q').value=e.results[0][0].transcript;
+
+$('q').placeholder='چه کاری برایت انجام بدهم؟';
+
+};
+
+recognition.onerror=()=>{
+
+$('q').placeholder='چه کاری برایت انجام بدهم؟';
+
+alert('دسترسی به میکروفون یا تشخیص صدا با مشکل مواجه شد.');
+
+};
+
+recognition.onend=()=>{
+
+$('q').placeholder='چه کاری برایت انجام بدهم؟';
+
+};
+
+recognition.start();
+
+}
+
+function speak(text){
+
+if(!('speechSynthesis'in window))return;
+
+speechSynthesis.cancel();
+
+const u=new SpeechSynthesisUtterance(text);
+
+u.lang='fa-IR';
+u.rate=.95;
+u.pitch=1;
+
+speechSynthesis.speak(u);
+
+}
+
+function speakLast(){
+
+if(lastAnswer)speak(lastAnswer);
+
+}
+
+$('q').addEventListener('keydown',e=>{
+
+if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){
+
+chat();
+
+}
+
+});
+
+check();
+
+if('serviceWorker'in navigator){
+
+navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+}
+</script>
+
+</body>
+</html>
