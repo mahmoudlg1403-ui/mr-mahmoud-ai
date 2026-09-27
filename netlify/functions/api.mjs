@@ -10,7 +10,7 @@ import serverless from 'serverless-http';
 dotenv.config();
 const app=express(); app.use(cors()); app.use(express.json({limit:'30mb'}));
 const __dirname=path.dirname(url.fileURLToPath(import.meta.url));
-const PORT=Number(process.env.PORT||8787); const DATA_DIR=process.env.DATA_DIR||'./data';
+const PORT=Number(process.env.PORT||8787); const DATA_DIR=process.env.DATA_DIR||'/tmp/mr-mahmoud-data';
 const files={memory:path.join(DATA_DIR,'memory.json'),tasks:path.join(DATA_DIR,'tasks.json'),history:path.join(DATA_DIR,'history.json'),projects:path.join(DATA_DIR,'projects.json')};
 const MAX_FILE_BYTES=15*1024*1024;
 const system=`You are Mr. Mahmoud AI, a Persian-speaking personal executive assistant. Be practical, concise, accurate and transparent. You can plan, research, analyze and propose actions. Never claim an external action was completed unless a real tool endpoint performed it. Ask for approval before consequential external actions. Use relevant memory when available.`;
@@ -21,7 +21,7 @@ async function memText(){const m=await read(files.memory,[]);return m.slice(0,80
 function cleanJson(s){return s.replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'').trim()}
 async function openai(messages,{web=false,json=false}={}){
  if(!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not configured');
- const mem=await memText(); const body={model:process.env.OPENAI_MODEL||'gpt-5.6-mini',input:[{role:'system',content:system},...(mem?[{role:'system',content:`Relevant memory:\n${mem}`}]:[]),...messages]};
+ const mem=await memText(); const body={model:process.env.OPENAI_MODEL||'gpt-5.6-luna',input:[{role:'system',content:system},...(mem?[{role:'system',content:`Relevant memory:\n${mem}`}]:[]),...messages]};
  if(web) body.tools=[{type:'web_search_preview'}];
  if(json) body.text={format:{type:'json_object'}};
  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json(); if(!r.ok)throw new Error(j.error?.message||'OpenAI error'); return j.output_text||'';
@@ -33,7 +33,7 @@ async function claude(messages,{json=false}={}){
 async function ask(provider,messages,opts={}){let p=provider||'auto'; if(p==='auto')p=process.env.OPENAI_API_KEY?'openai':(process.env.ANTHROPIC_API_KEY?'claude':'none'); if(p==='none')throw new Error('No AI provider configured'); return {provider:p,text:p==='openai'?await openai(messages,opts):await claude(messages,opts)} }
 
 app.get('/health',(q,s)=>s.json({ok:true,version:'8.0',features:['chat','memory','agent','web','tasks','projects','history','file-analysis','approval','tool-execution']}));
-app.post('/api/chat',async(q,s)=>{try{const messages=(q.body.messages||[]).slice(-30).map(x=>({role:x.role==='assistant'?'assistant':'user',content:String(x.content||'')})); const r=await ask(q.body.provider,messages,{web:Boolean(q.body.web)}); const h=await read(files.history,[]); h.unshift({id:id(),createdAt:new Date().toISOString(),provider:r.provider,messages:[...messages,{role:'assistant',content:r.text}]}); await write(files.history,h.slice(0,100)); s.json(r)}catch(e){s.status(500).json({error:e.message})}});
+app.post('/api/chat',async(q,s)=>{try{const messages=(q.body.messages||[]).slice(-30).map(x=>({role:x.role==='assistant'?'assistant':'user',content:String(x.content||'')})); const r=await ask(q.body.provider,messages,{web:Boolean(q.body.web)}); const h=await read(files.history,[]); h.unshift({id:id(),createdAt:new Date().toISOString(),provider:r.provider,messages:[...messages,{role:'assistant',content:r.text}]}); try{await write(files.history,h.slice(0,100))}catch{} s.json(r)}catch(e){s.status(500).json({error:e.message})}});
 app.get('/api/history',async(q,s)=>s.json({items:await read(files.history,[])}));
 app.delete('/api/history',async(q,s)=>{await write(files.history,[]);s.json({ok:true})});
 app.post('/api/web-search',async(q,s)=>{try{const query=String(q.body.query||'').trim();if(!query)return s.status(400).json({error:'query required'});s.json(await ask('openai',[{role:'user',content:`با جستجوی وب درباره موضوع زیر تحقیق کن. پاسخ فارسی، خلاصه و کاربردی بده و منابع/تاریخ‌های مهم را مشخص کن:\n${query}`}],{web:true}))}catch(e){s.status(500).json({error:e.message})}});
