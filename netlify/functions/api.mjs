@@ -421,13 +421,36 @@ app.post(
               String(x.content || '')
           }));
 
-      const r = await ask(
-        q.body.provider,
-        messages,
-        {
-          web: Boolean(q.body.web)
-        }
-      );
+    
+    
+        
+    
+      let r;
+
+const userText =
+  messages[messages.length - 1]?.content
+    ?.trim()
+    ?.toLowerCase() || '';
+
+if (
+  /اسمت چیه|اسمت چیست|نامت چیه|نام شما چیست|خودت را معرفی کن|خودتو معرفی کن/.test(
+    userText
+  )
+) {
+  r = {
+    provider: 'groq',
+    text:
+      'من محمود هستم 🤖\nدستیار شخصی هوشمند شما. می‌توانم در گفتگو، برنامه‌ریزی، مدیریت کارها، حافظه، پروژه‌ها، تحلیل اطلاعات و اجرای کارهای قابل انجام به شما کمک کنم.'
+  };
+} else {
+  r = await ask(
+    q.body.provider,
+    messages,
+    {
+      web: Boolean(q.body.web)
+    }
+  );
+}
 
       const h =
         await read(files.history, []);
