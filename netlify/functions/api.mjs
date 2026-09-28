@@ -24,6 +24,32 @@ async function openai(messages,{web=false,json=false}={}){
  if(json) body.text={format:{type:'json_object'}};
  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json(); if(!r.ok)throw new Error(j.error?.message||'OpenAI error'); return j.output_text||'';
 }
+async function groq(messages,{json=false}={}){
+ if(!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY is not configured');
+ const mem=await memText();
+ const msgs=[
+   {role:'system',content:system+(mem?`\nRelevant memory:\n${mem}`:'')},
+   ...messages
+ ];
+ const body={
+   model:process.env.GROQ_MODEL||'openai/gpt-oss-120b',
+   messages:msgs,
+   temperature:0.7,
+   max_completion_tokens:2048
+ };
+ if(json) body.response_format={type:'json_object'};
+ const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+   method:'POST',
+   headers:{
+     Authorization:`Bearer ${process.env.GROQ_API_KEY}`,
+     'Content-Type':'application/json'
+   },
+   body:JSON.stringify(body)
+ });
+ const j=await r.json();
+ if(!r.ok) throw new Error(j.error?.message||'Groq error');
+ return j.choices?.[0]?.message?.content||'';
+}
 async function claude(messages,{json=false}={}){
  if(!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
  const mem=await memText(); const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':process.env.ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01','content-type':'application/json'},body:JSON.stringify({model:process.env.CLAUDE_MODEL||'claude-sonnet-4-5',max_tokens:8192,system:system+(mem?`\nRelevant memory:\n${mem}`:''),messages})}); const j=await r.json(); if(!r.ok)throw new Error(j.error?.message||'Claude error'); return (j.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('');
