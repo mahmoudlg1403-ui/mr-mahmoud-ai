@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import serverless from 'serverless-http';
 
 dotenv.config();
-const app=express(); app.use(cors()); app.use(express.json({limit:'30mb'}));
+const app=express(); app.use(cors()); app.use(express.json({limit:'30mb'})); app.use((req,res,next)=>{req.url=req.url.replace(/^\/\.netlify\/functions\/api/,'')||'/';next();});
 const PORT=Number(process.env.PORT||8787); const DATA_DIR=process.env.DATA_DIR||'/tmp/mr-mahmoud-data';
 const files={memory:path.join(DATA_DIR,'memory.json'),tasks:path.join(DATA_DIR,'tasks.json'),history:path.join(DATA_DIR,'history.json'),projects:path.join(DATA_DIR,'projects.json')};
 const MAX_FILE_BYTES=15*1024*1024;
