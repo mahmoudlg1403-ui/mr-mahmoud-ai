@@ -146,7 +146,14 @@ content:q
 
 const j=await r.json();
 
-const answer=j.text||j.error||'پاسخی دریافت نشد.';
+let answer=j.text||j.error||'پاسخی دریافت نشد.';
+
+const identityQuestion =
+/اسمت چیه|اسمت چیست|نامت چیه|نام شما چیست|خودت را معرفی کن|خودتو معرفی کن/i.test(q);
+
+if(identityQuestion){
+  answer='من محمود هستم 🤖\nدستیار شخصی هوشمند شما. می‌توانم در گفتگو، برنامه‌ریزی، مدیریت کارها، حافظه، پروژه‌ها، تحلیل اطلاعات و اجرای کارهای قابل انجام به شما کمک کنم.';
+}
 
 lastAnswer=answer;
 
